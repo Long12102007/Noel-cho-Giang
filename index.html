@@ -116,6 +116,39 @@
                 grd.addColorStop(1, 'rgba(0,0,0,0)');
                 ctx.fillStyle = grd; ctx.fillRect(0,0,128,128);
 
+            } else if (type === 'pine_needle') {
+                // Bauble-style glow (warm ornament amber)
+                const grd = ctx.createRadialGradient(cx, cy, 0, cx, cy, 48);
+                grd.addColorStop(0, '#FFF5DC');
+                grd.addColorStop(0.3, '#F4C542');
+                grd.addColorStop(0.55, '#D19A2E');
+                grd.addColorStop(1, 'rgba(0,0,0,0)');
+                ctx.fillStyle = grd; ctx.fillRect(0,0,128,128);
+
+            } else if (type === 'icon_star') {
+                // Small glowing ornament icon
+                ctx.fillStyle = 'rgba(0,0,0,0)';
+                ctx.fillRect(0,0,128,128);
+                ctx.save();
+                ctx.translate(cx, cy);
+                ctx.rotate(Math.PI / 10);
+                ctx.beginPath();
+                const outer = 46, inner = 18;
+                for(let i=0;i<5;i++){
+                    ctx.lineTo(Math.cos((18+i*72)/180*Math.PI)*outer, -Math.sin((18+i*72)/180*Math.PI)*outer);
+                    ctx.lineTo(Math.cos((54+i*72)/180*Math.PI)*inner, -Math.sin((54+i*72)/180*Math.PI)*inner);
+                }
+                ctx.closePath();
+                const grd = ctx.createRadialGradient(0,0,0,0,0,50);
+                grd.addColorStop(0, '#FFF8DC');
+                grd.addColorStop(0.4, '#FFD700');
+                grd.addColorStop(1, 'rgba(255,215,0,0)');
+                ctx.fillStyle = grd;
+                ctx.shadowColor = '#FFD700';
+                ctx.shadowBlur = 25;
+                ctx.fill();
+                ctx.restore();
+
             } else if (type === 'gift_red') {
                 ctx.fillStyle = '#D32F2F'; ctx.fillRect(20, 20, 88, 88);
                 ctx.fillStyle = '#FFD700'; ctx.fillRect(54, 20, 20, 88); ctx.fillRect(20, 54, 88, 20);
@@ -127,6 +160,8 @@
         const textures = {
             gold: createCustomTexture('gold_glow'),
             red: createCustomTexture('red_light'),
+            pine: createCustomTexture('pine_needle'),
+            icon: createCustomTexture('icon_star'),
             gift: createCustomTexture('gift_red')
         };
 
@@ -136,6 +171,8 @@
         const CONFIG = {
             goldCount: 2000,
             redCount: 300,
+            pineCount: 1600,
+            iconCount: 220,
             giftCount: 150,
             explodeRadius: 65,  
             photoOrbitRadius: 25,
@@ -144,7 +181,7 @@
         };
 
         let scene, camera, renderer;
-        let groupGold, groupRed, groupGift; 
+        let groupGold, groupRed, groupPine, groupIcon, groupGift; 
         let photoMeshes = [];    
         let titleMesh, starMesh, loveMesh;
         
@@ -170,6 +207,8 @@
 
             groupGold = createParticleSystem('gold', CONFIG.goldCount, 2.0);
             groupRed = createParticleSystem('red', CONFIG.redCount, 3.5); 
+            groupPine = createParticleSystem('pine', CONFIG.pineCount, 2.5); 
+            groupIcon = createParticleSystem('icon', CONFIG.iconCount, 3.0); 
             groupGift = createParticleSystem('gift', CONFIG.giftCount, 3.0); 
 
             createPhotos();
@@ -236,6 +275,8 @@
             const baseColor = new THREE.Color();
             if(type === 'gold') baseColor.setHex(0xFFD700);
             else if(type === 'red') baseColor.setHex(0xFF0000);
+            else if(type === 'pine') baseColor.setHex(0xD19A2E);
+            else if(type === 'icon') baseColor.setHex(0xFFD700);
             else baseColor.setHex(0xFFFFFF);
 
             for(let i=0; i<count; i++) {
@@ -357,12 +398,15 @@
                 for(let i=0; i<count; i++) {
                     sizes[i] = baseSize;
                     let brightness = 1.0;
-                    if(type === 'red') {
+                    if(type === 'red' || type === 'icon') {
                         // RED
                         brightness = 0.5 + 0.5 * Math.sin(time * 3 + phases[i]);
                     } else if(type === 'gold') {
                         // YELLOW
                         brightness = 0.8 + 0.4 * Math.sin(time * 10 + phases[i]);
+                    } else if(type === 'pine') {
+                        // Bauble pink twinkle
+                        brightness = 0.85 + 0.15 * Math.sin(time * 6 + phases[i]);
                     }
                     colors[i*3]   = baseColor.r * brightness;
                     colors[i*3+1] = baseColor.g * brightness;
@@ -394,8 +438,10 @@
                 for(let i=0; i<count; i++) {
                     sizes[i] = baseSize;
                     let brightness = 1.0;
-                    if(type === 'gold' || type === 'red') {
+                    if(type === 'gold' || type === 'red' || type === 'icon') {
                         brightness = 0.8 + 0.5 * Math.sin(time * 12 + phases[i]);
+                    } else if(type === 'pine') {
+                        brightness = 0.9 + 0.1 * Math.sin(time * 8 + phases[i]);
                     }
                     colors[i*3]   = baseColor.r * brightness;
                     colors[i*3+1] = baseColor.g * brightness;
@@ -414,6 +460,8 @@
 
             updateParticleGroup(groupGold, 'gold', state, speed, handRotY, time);
             updateParticleGroup(groupRed, 'red', state, speed, handRotY, time);
+            updateParticleGroup(groupPine, 'pine', state, speed, handRotY, time);
+            updateParticleGroup(groupIcon, 'icon', state, speed, handRotY, time);
             updateParticleGroup(groupGift, 'gift', state, speed, handRotY, time);
 
             photoMeshes.forEach((mesh, i) => {
@@ -527,6 +575,6 @@
         window.addEventListener('resize', () => {
             if(camera) { camera.aspect = window.innerWidth/window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); }
         });
-    </script>
+    </script><script src="Snowflakes.js"></script>
 </body>
 </html>
