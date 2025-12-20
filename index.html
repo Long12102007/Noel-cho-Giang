@@ -14,13 +14,13 @@
         body { margin: 0; overflow: hidden; background-color: #000000; font-family: 'Segoe UI', sans-serif; }
         #canvas-container { width: 100%; height: 100vh; display: block; }
         
-        /* UI Center Vandiep */
+        /* UI Center  */
         #ui-layer {
             position: absolute; bottom: 30px; width: 100%;
             text-align: center; pointer-events: none; z-index: 100;
         }
         
-        /* Guide text Vandiep */
+        /* Guide text  */
         .guide { 
             color: rgba(255, 255, 255, 0.6); 
             font-size: 13px; 
@@ -39,7 +39,7 @@
         }
         @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
 
-        /* Camera Preview Vandiep */
+        /* Camera Preview  */
         #camera-preview {
             position: absolute; top: 15px; right: 15px;
             width: 120px; height: 90px;
@@ -47,19 +47,7 @@
             transform: scaleX(-1); opacity: 0.6; border-radius: 8px;
         }
         
-        /* Vandiep */
-        #copyright {
-            position: absolute;
-            bottom: 10px;
-            right: 15px;
-            color: rgba(255, 255, 255, 0.3);
-            font-size: 12px;
-            z-index: 100;
-            font-family: sans-serif;
-            pointer-events: none;
-            font-style: italic;
-        }
-
+        
         #error-log { display: none; position: absolute; top: 0; left: 0; color: red; background: rgba(0,0,0,0.8); z-index: 999; padding: 10px; }
     </style>
 </head>
@@ -75,8 +63,7 @@
         <button id="btnStart" onclick="startSystem()">START MAGIC</button>
     </div>
 
-    <!-- Vandiep -->
-    <div id="copyright">© by vandiep</div>
+  
 
     <div id="canvas-container"></div>
     <video class="input_video" style="display:none"></video>
@@ -122,6 +109,15 @@
                 grd.addColorStop(0, '#FFF5DC');
                 grd.addColorStop(0.3, '#F4C542');
                 grd.addColorStop(0.55, '#D19A2E');
+                grd.addColorStop(1, 'rgba(0,0,0,0)');
+                ctx.fillStyle = grd; ctx.fillRect(0,0,128,128);
+
+            } else if (type === 'green_ornament') {
+                // Green ornament glow
+                const grd = ctx.createRadialGradient(cx, cy, 0, cx, cy, 48);
+                grd.addColorStop(0, '#E8FFE8');
+                grd.addColorStop(0.3, '#66FF99');
+                grd.addColorStop(0.55, '#2ECC71');
                 grd.addColorStop(1, 'rgba(0,0,0,0)');
                 ctx.fillStyle = grd; ctx.fillRect(0,0,128,128);
 
@@ -176,6 +172,7 @@
             gold: createCustomTexture('gold_glow'),
             red: createCustomTexture('red_light'),
             pine: createCustomTexture('pine_needle'),
+            green: createCustomTexture('green_ornament'),
             icon: createCustomTexture('icon_star'),
             snow: createCustomTexture('snowflake'),
             gift: createCustomTexture('gift_red')
@@ -188,6 +185,7 @@
             goldCount: 2000,
             redCount: 300,
             pineCount: 1600,
+            greenCount: 250,
             iconCount: 220,
             giftCount: 150,
             snowCount: 900,
@@ -198,7 +196,7 @@
         };
 
         let scene, camera, renderer;
-        let groupGold, groupRed, groupPine, groupIcon, groupGift, snowGroup; 
+        let groupGold, groupRed, groupPine, groupGreen, groupIcon, groupGift, snowGroup; 
         let photoMeshes = [];    
         let titleMesh, starMesh, loveMesh;
         let snowVelocity = [];
@@ -226,6 +224,7 @@
             groupGold = createParticleSystem('gold', CONFIG.goldCount, 2.0);
             groupRed = createParticleSystem('red', CONFIG.redCount, 3.5); 
             groupPine = createParticleSystem('pine', CONFIG.pineCount, 2.5); 
+            groupGreen = createParticleSystem('green', CONFIG.greenCount, 3.2); 
             groupIcon = createParticleSystem('icon', CONFIG.iconCount, 3.0); 
             groupGift = createParticleSystem('gift', CONFIG.giftCount, 3.0); 
             snowGroup = createSnowBackground(CONFIG.snowCount);
@@ -320,6 +319,7 @@
             if(type === 'gold') baseColor.setHex(0xFFD700);
             else if(type === 'red') baseColor.setHex(0xFF0000);
             else if(type === 'pine') baseColor.setHex(0xD19A2E);
+            else if(type === 'green') baseColor.setHex(0x2ECC71);
             else if(type === 'icon') baseColor.setHex(0xFFD700);
             else baseColor.setHex(0xFFFFFF);
 
@@ -405,9 +405,9 @@
             loveCanvas.width = 1024; loveCanvas.height = 256;
             const lCtx = loveCanvas.getContext('2d');
             lCtx.font = 'bold 120px "Segoe UI", sans-serif';
-            lCtx.fillStyle = '#FF69B4'; lCtx.textAlign = 'center';
+            lCtx.fillStyle = '#FFFFFF'; lCtx.textAlign = 'center';
             lCtx.shadowColor = "#FF1493"; lCtx.shadowBlur = 40; 
-            lCtx.fillText("I LOVE YOU ❤️", 512, 130);
+            lCtx.fillText("Hoàng Giang", 512, 130);
             const loveTex = new THREE.CanvasTexture(loveCanvas);
             const loveMat = new THREE.MeshBasicMaterial({ map: loveTex, transparent: true, blending: THREE.AdditiveBlending });
             loveMesh = new THREE.Mesh(new THREE.PlaneGeometry(70, 18), loveMat);
@@ -451,6 +451,9 @@
                     } else if(type === 'pine') {
                         // Bauble pink twinkle
                         brightness = 0.85 + 0.15 * Math.sin(time * 6 + phases[i]);
+                    } else if(type === 'green') {
+                        // Green twinkle
+                        brightness = 0.8 + 0.2 * Math.sin(time * 4 + phases[i]);
                     }
                     colors[i*3]   = baseColor.r * brightness;
                     colors[i*3+1] = baseColor.g * brightness;
@@ -486,6 +489,8 @@
                         brightness = 0.8 + 0.5 * Math.sin(time * 12 + phases[i]);
                     } else if(type === 'pine') {
                         brightness = 0.9 + 0.1 * Math.sin(time * 8 + phases[i]);
+                    } else if(type === 'green') {
+                        brightness = 0.9 + 0.15 * Math.sin(time * 9 + phases[i]);
                     }
                     colors[i*3]   = baseColor.r * brightness;
                     colors[i*3+1] = baseColor.g * brightness;
@@ -505,6 +510,7 @@
             updateParticleGroup(groupGold, 'gold', state, speed, handRotY, time);
             updateParticleGroup(groupRed, 'red', state, speed, handRotY, time);
             updateParticleGroup(groupPine, 'pine', state, speed, handRotY, time);
+            updateParticleGroup(groupGreen, 'green', state, speed, handRotY, time);
             updateParticleGroup(groupIcon, 'icon', state, speed, handRotY, time);
             updateParticleGroup(groupGift, 'gift', state, speed, handRotY, time);
             updateSnow(time);
