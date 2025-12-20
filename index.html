@@ -54,9 +54,8 @@
 <body>
     <div id="error-log"></div>
     
-    <!-- UI Vandiep -->
+    <!-- UI Layer -->
     <div id="ui-layer">
-        <!-- Vandiep -->
         <div class="guide">
             🖐 <b>Open:</b> Explode &nbsp;|&nbsp; 🫶 <b>Heart:</b> Love &nbsp;|&nbsp; ✊ <b>Fist:</b> Tree
         </div>
@@ -71,16 +70,32 @@
 
     <script>
         // ==========================================
-        // 1. RESOURCES CONFIG Vandiep
+        // 1. CONSTANTS & CONFIGURATION
         // ==========================================
         const MUSIC_URL = "./audio.mp3";
+        const PHOTO_FILES = ['./image1.jpeg', './image2.jpeg', './image3.jpeg', './image4.jpeg', './image5.jpeg'];
+        const STATES = {
+            TREE: 'TREE',
+            HEART: 'HEART',
+            EXPLODE: 'EXPLODE',
+            PHOTO: 'PHOTO'
+        };
+        
+        // Color constants
+        const COLORS = {
+            GOLD: 0xFFD700,
+            RED: 0xFF0000,
+            PINE: 0xD19A2E,
+            GREEN: 0x2ECC71,
+            WHITE: 0xFFFFFF
+        };
+
         let bgMusic = new Audio(MUSIC_URL);
-        bgMusic.loop = true; bgMusic.volume = 1.0;
+        bgMusic.loop = true;
+        bgMusic.volume = 1.0;
 
         const loader = new THREE.TextureLoader();
-        const photoFiles = ['./image1.jpeg', './image2.jpeg', './image3.jpeg', './image4.jpeg', './image5.jpeg'];
-        const photoTextures = [];
-        photoFiles.forEach((f, i) => photoTextures[i] = loader.load(f));
+        const photoTextures = PHOTO_FILES.map(file => loader.load(file));
 
         function createCustomTexture(type) {
             const canvas = document.createElement('canvas');
@@ -147,19 +162,24 @@
 
             } else if (type === 'snowflake') {
                 // Simple snowflake sprite
-                ctx.clearRect(0,0,128,128);
-                ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+                ctx.clearRect(0, 0, 128, 128);
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
                 ctx.lineWidth = 3;
+                ctx.save();
                 ctx.translate(cx, cy);
-                for(let i=0;i<6;i++){
-                    ctx.rotate(Math.PI/3);
+                for(let i = 0; i < 6; i++) {
+                    ctx.rotate(Math.PI / 3);
                     ctx.beginPath();
-                    ctx.moveTo(0,0); ctx.lineTo(0,50);
+                    ctx.moveTo(0, 0);
+                    ctx.lineTo(0, 50);
                     ctx.stroke();
                     ctx.beginPath();
-                    ctx.moveTo(-6,32); ctx.lineTo(0,42); ctx.lineTo(6,32);
+                    ctx.moveTo(-6, 32);
+                    ctx.lineTo(0, 42);
+                    ctx.lineTo(6, 32);
                     ctx.stroke();
                 }
+                ctx.restore();
             } else if (type === 'gift_red') {
                 ctx.fillStyle = '#D32F2F'; ctx.fillRect(20, 20, 88, 88);
                 ctx.fillStyle = '#FFD700'; ctx.fillRect(54, 20, 20, 88); ctx.fillRect(20, 54, 88, 20);
@@ -179,41 +199,66 @@
         };
 
         // ==========================================
-        // 2. SYSTEM CONFIG Vandiep
+        // 2. SYSTEM CONFIGURATION
         // ==========================================
         const CONFIG = {
-            goldCount: 2000,
-            redCount: 300,
-            pineCount: 1600,
-            greenCount: 250,
-            iconCount: 220,
-            giftCount: 150,
+            particleCounts: {
+                gold: 2000,
+                red: 300,
+                pine: 1600,
+                green: 250,
+                icon: 220,
+                gift: 150
+            },
             snowCount: 900,
             explodeRadius: 65,  
             photoOrbitRadius: 25,
             treeHeight: 70,
-            treeBaseRadius: 35
+            treeBaseRadius: 35,
+            animation: {
+                treeRotationSpeed: 0.003,
+                starRotationSpeed: 0.02,
+                heartBeatSpeed: 3,
+                lerpSpeed: 0.1
+            }
         };
 
+        // Scene variables
         let scene, camera, renderer;
-        let groupGold, groupRed, groupPine, groupGreen, groupIcon, groupGift, snowGroup; 
+        let particleGroups = {};
+        let snowGroup; 
         let photoMeshes = [];    
         let titleMesh, starMesh, loveMesh;
         let snowVelocity = [];
         
-        let state = 'TREE'; 
+        let state = STATES.TREE; 
         let selectedIndex = 0;
         let handX = 0.5;
+        
+        // Particle type definitions
+        const PARTICLE_TYPES = [
+            { type: 'gold', size: 2.0 },
+            { type: 'red', size: 3.5 },
+            { type: 'pine', size: 2.5 },
+            { type: 'green', size: 3.2 },
+            { type: 'icon', size: 3.0 },
+            { type: 'gift', size: 3.0 }
+        ];
 
         // ==========================================
-        // 3. THREE.JS SYSTEM Vandiep
+        // 3. THREE.JS INITIALIZATION
         // ==========================================
         function init3D() {
             const container = document.getElementById('canvas-container');
+            if (!container) {
+                console.error('Canvas container not found');
+                return;
+            }
+
             scene = new THREE.Scene();
             scene.fog = new THREE.FogExp2(0x000000, 0.002);
 
-            camera = new THREE.PerspectiveCamera(60, window.innerWidth/window.innerHeight, 0.1, 1000);
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
             camera.position.z = 100;
 
             renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
@@ -221,12 +266,15 @@
             renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
             container.appendChild(renderer.domElement);
 
-            groupGold = createParticleSystem('gold', CONFIG.goldCount, 2.0);
-            groupRed = createParticleSystem('red', CONFIG.redCount, 3.5); 
-            groupPine = createParticleSystem('pine', CONFIG.pineCount, 2.5); 
-            groupGreen = createParticleSystem('green', CONFIG.greenCount, 3.2); 
-            groupIcon = createParticleSystem('icon', CONFIG.iconCount, 3.0); 
-            groupGift = createParticleSystem('gift', CONFIG.giftCount, 3.0); 
+            // Create particle systems
+            PARTICLE_TYPES.forEach(({ type, size }) => {
+                particleGroups[type] = createParticleSystem(
+                    type, 
+                    CONFIG.particleCounts[type], 
+                    size
+                );
+            });
+            
             snowGroup = createSnowBackground(CONFIG.snowCount);
 
             createPhotos();
@@ -267,33 +315,39 @@
             const sizes = []; 
             const phases = []; 
             
-            for(let i=0; i<count; i++) {
-                // --- TREE Vandiep ---
-                const h = Math.random() * CONFIG.treeHeight; 
+            for(let i = 0; i < count; i++) {
+                // Tree shape positions
+                const h = Math.random() * CONFIG.treeHeight;
                 const y = h - CONFIG.treeHeight / 2;
-                let radiusRatio = (type === 'gold') ? Math.sqrt(Math.random()) : 0.9 + Math.random()*0.1;
+                const radiusRatio = (type === 'gold') ? Math.sqrt(Math.random()) : 0.9 + Math.random() * 0.1;
                 const maxR = (1 - (h / CONFIG.treeHeight)) * CONFIG.treeBaseRadius;
-                const r = maxR * radiusRatio; 
+                const r = maxR * radiusRatio;
                 const theta = Math.random() * Math.PI * 2;
                 pTreeTargets.push(r * Math.cos(theta), y, r * Math.sin(theta));
 
-                // --- EXPLODE Vandiep ---
+                // Explode sphere positions
                 const u = Math.random();
                 const v = Math.random();
                 const phi = Math.acos(2 * v - 1);
                 const lam = 2 * Math.PI * u;
-                let radMult = (type === 'gift') ? 1.2 : 1.0;
+                const radMult = (type === 'gift') ? 1.2 : 1.0;
                 const rad = CONFIG.explodeRadius * Math.cbrt(Math.random()) * radMult;
-                pExplodeTargets.push(rad * Math.sin(phi) * Math.cos(lam), rad * Math.sin(phi) * Math.sin(lam), rad * Math.cos(phi));
+                pExplodeTargets.push(
+                    rad * Math.sin(phi) * Math.cos(lam),
+                    rad * Math.sin(phi) * Math.sin(lam),
+                    rad * Math.cos(phi)
+                );
 
-                // --- SOFT HEART Vandiep ---
+                // Heart shape positions
                 const tHeart = Math.random() * Math.PI * 2;
                 let hx = 16 * Math.pow(Math.sin(tHeart), 3);
-                let hy = 13 * Math.cos(tHeart) - 5 * Math.cos(2*tHeart) - 2 * Math.cos(3*tHeart) - Math.cos(4*tHeart);
+                let hy = 13 * Math.cos(tHeart) - 5 * Math.cos(2 * tHeart) - 
+                         2 * Math.cos(3 * tHeart) - Math.cos(4 * tHeart);
                 
-                const rFill = Math.pow(Math.random(), 0.3); // Soft fill Vandiep
-                hx *= rFill; hy *= rFill;
-                let hz = (Math.random() - 0.5) * 8 * rFill; 
+                const rFill = Math.pow(Math.random(), 0.3); // Soft fill
+                hx *= rFill;
+                hy *= rFill;
+                let hz = (Math.random() - 0.5) * 8 * rFill;
                 
                 const noise = 1.0;
                 hx += (Math.random() - 0.5) * noise;
@@ -301,10 +355,11 @@
                 hz += (Math.random() - 0.5) * noise;
 
                 const scaleH = 2.2;
-                pHeartTargets.push(hx * scaleH, hy * scaleH + 5, hz); 
+                pHeartTargets.push(hx * scaleH, hy * scaleH + 5, hz);
 
-                // --- INIT Vandiep ---
-                pPositions.push(pTreeTargets[i*3], pTreeTargets[i*3+1], pTreeTargets[i*3+2]);
+                // Initial positions
+                const idx = i * 3;
+                pPositions.push(pTreeTargets[idx], pTreeTargets[idx + 1], pTreeTargets[idx + 2]);
                 sizes.push(size);
                 phases.push(Math.random() * Math.PI * 2);
             }
@@ -313,15 +368,17 @@
             geo.setAttribute('position', new THREE.Float32BufferAttribute(pPositions, 3));
             geo.setAttribute('size', new THREE.Float32BufferAttribute(sizes, 1));
             
-            // Init colors Vandiep
+            // Initialize colors
             const colors = new Float32Array(count * 3);
             const baseColor = new THREE.Color();
-            if(type === 'gold') baseColor.setHex(0xFFD700);
-            else if(type === 'red') baseColor.setHex(0xFF0000);
-            else if(type === 'pine') baseColor.setHex(0xD19A2E);
-            else if(type === 'green') baseColor.setHex(0x2ECC71);
-            else if(type === 'icon') baseColor.setHex(0xFFD700);
-            else baseColor.setHex(0xFFFFFF);
+            const colorMap = {
+                gold: COLORS.GOLD,
+                red: COLORS.RED,
+                pine: COLORS.PINE,
+                green: COLORS.GREEN,
+                icon: COLORS.GOLD
+            };
+            baseColor.setHex(colorMap[type] || COLORS.WHITE);
 
             for(let i=0; i<count; i++) {
                 colors[i*3] = baseColor.r;
@@ -368,52 +425,102 @@
         }
 
         function createDecorations() {
-            // MERRY CHRISTMAS Vandiep
+            // Title text: "MERRY CHRISTMAS"
             const canvas = document.createElement('canvas');
-            canvas.width = 1024; canvas.height = 256;
+            canvas.width = 1024;
+            canvas.height = 256;
             const ctx = canvas.getContext('2d');
             ctx.font = 'bold italic 90px "Times New Roman"';
-            ctx.fillStyle = '#FFD700'; ctx.textAlign = 'center';
-            ctx.shadowColor = "#FF0000"; ctx.shadowBlur = 40; 
+            ctx.fillStyle = '#FFD700';
+            ctx.textAlign = 'center';
+            ctx.shadowColor = "#FF0000";
+            ctx.shadowBlur = 40;
             ctx.fillText("MERRY CHRISTMAS", 512, 130);
             const tex = new THREE.CanvasTexture(canvas);
-            const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, blending: THREE.AdditiveBlending });
+            const mat = new THREE.MeshBasicMaterial({
+                map: tex,
+                transparent: true,
+                blending: THREE.AdditiveBlending
+            });
             titleMesh = new THREE.Mesh(new THREE.PlaneGeometry(60, 15), mat);
             titleMesh.position.set(0, 50, 0);
             scene.add(titleMesh);
 
-            // STAR Vandiep
+            // Star on top of tree
             const starCanvas = document.createElement('canvas');
-            starCanvas.width = 128; starCanvas.height = 128;
+            starCanvas.width = 128;
+            starCanvas.height = 128;
             const sCtx = starCanvas.getContext('2d');
-            sCtx.fillStyle = "#FFFF00"; sCtx.shadowColor="#FFF"; sCtx.shadowBlur=20;
+            sCtx.fillStyle = "#FFFF00";
+            sCtx.shadowColor = "#FFF";
+            sCtx.shadowBlur = 20;
             sCtx.beginPath();
-            const cx=64, cy=64, outer=50, inner=20;
-            for(let i=0; i<5; i++){
-                sCtx.lineTo(cx + Math.cos((18+i*72)/180*Math.PI)*outer, cy - Math.sin((18+i*72)/180*Math.PI)*outer);
-                sCtx.lineTo(cx + Math.cos((54+i*72)/180*Math.PI)*inner, cy - Math.sin((54+i*72)/180*Math.PI)*inner);
+            const cx = 64, cy = 64, outer = 50, inner = 20;
+            for(let i = 0; i < 5; i++) {
+                const outerAngle = (18 + i * 72) * Math.PI / 180;
+                const innerAngle = (54 + i * 72) * Math.PI / 180;
+                sCtx.lineTo(cx + Math.cos(outerAngle) * outer, cy - Math.sin(outerAngle) * outer);
+                sCtx.lineTo(cx + Math.cos(innerAngle) * inner, cy - Math.sin(innerAngle) * inner);
             }
-            sCtx.closePath(); sCtx.fill();
+            sCtx.closePath();
+            sCtx.fill();
             const starTex = new THREE.CanvasTexture(starCanvas);
-            const starMat = new THREE.MeshBasicMaterial({ map: starTex, transparent: true, blending: THREE.AdditiveBlending });
+            const starMat = new THREE.MeshBasicMaterial({
+                map: starTex,
+                transparent: true,
+                blending: THREE.AdditiveBlending
+            });
             starMesh = new THREE.Mesh(new THREE.PlaneGeometry(12, 12), starMat);
-            starMesh.position.set(0, CONFIG.treeHeight/2 + 2, 0);
+            starMesh.position.set(0, CONFIG.treeHeight / 2 + 2, 0);
             scene.add(starMesh);
 
-            // I LOVE YOU TEXT Vandiep
+            // Name text for heart state
             const loveCanvas = document.createElement('canvas');
-            loveCanvas.width = 1024; loveCanvas.height = 256;
+            loveCanvas.width = 1024;
+            loveCanvas.height = 256;
             const lCtx = loveCanvas.getContext('2d');
             lCtx.font = 'bold 120px "Segoe UI", sans-serif';
-            lCtx.fillStyle = '#FFFFFF'; lCtx.textAlign = 'center';
-            lCtx.shadowColor = "#FF1493"; lCtx.shadowBlur = 40; 
+            lCtx.fillStyle = '#FFFFFF';
+            lCtx.textAlign = 'center';
+            lCtx.shadowColor = "#FF1493";
+            lCtx.shadowBlur = 40;
             lCtx.fillText("Hoàng Giang", 512, 130);
             const loveTex = new THREE.CanvasTexture(loveCanvas);
-            const loveMat = new THREE.MeshBasicMaterial({ map: loveTex, transparent: true, blending: THREE.AdditiveBlending });
+            const loveMat = new THREE.MeshBasicMaterial({
+                map: loveTex,
+                transparent: true,
+                blending: THREE.AdditiveBlending
+            });
             loveMesh = new THREE.Mesh(new THREE.PlaneGeometry(70, 18), loveMat);
             loveMesh.position.set(0, 0, 20);
             loveMesh.visible = false;
             scene.add(loveMesh);
+        }
+
+        // Brightness calculation functions
+        function calculateBrightness(type, time, phase, state) {
+            const brightnessConfig = {
+                TREE: {
+                    red: { base: 0.5, amplitude: 0.5, frequency: 3 },
+                    icon: { base: 0.5, amplitude: 0.5, frequency: 3 },
+                    gold: { base: 0.8, amplitude: 0.4, frequency: 10 },
+                    pine: { base: 0.85, amplitude: 0.15, frequency: 6 },
+                    green: { base: 0.8, amplitude: 0.2, frequency: 4 }
+                },
+                EXPLODE: {
+                    gold: { base: 0.8, amplitude: 0.5, frequency: 12 },
+                    red: { base: 0.8, amplitude: 0.5, frequency: 12 },
+                    icon: { base: 0.8, amplitude: 0.5, frequency: 12 },
+                    pine: { base: 0.9, amplitude: 0.1, frequency: 8 },
+                    green: { base: 0.9, amplitude: 0.15, frequency: 9 }
+                }
+            };
+            
+            const config = brightnessConfig[state]?.[type];
+            if (config) {
+                return config.base + config.amplitude * Math.sin(time * config.frequency + phase);
+            }
+            return 1.0;
         }
 
         function updateParticleGroup(group, type, targetState, speed, handRotY, time) {
@@ -424,77 +531,60 @@
             const baseColor = group.geometry.userData.baseColor;
             const baseSize = group.geometry.userData.baseSize;
             
-            const targetKey = (targetState === 'TREE') ? 'tree' : (targetState === 'HEART' ? 'heart' : 'explode');
-            const targets = group.geometry.userData[(targetState === 'PHOTO') ? 'explode' : targetKey];
+            // Determine target positions
+            const targetKey = targetState === STATES.TREE ? 'tree' : 
+                            targetState === STATES.HEART ? 'heart' : 'explode';
+            const targets = group.geometry.userData[targetState === STATES.PHOTO ? 'explode' : targetKey];
 
-            // 1. Vandiep
-            for(let i=0; i<positions.length; i++) {
+            // Update positions with interpolation
+            for(let i = 0; i < positions.length; i++) {
                 positions[i] += (targets[i] - positions[i]) * speed;
             }
             group.geometry.attributes.position.needsUpdate = true;
             
-            // 2. COLOR & SIZE Vandiep
             const count = positions.length / 3;
             
-            if (targetState === 'TREE') {
-                group.rotation.y += 0.003;
+            if (targetState === STATES.TREE) {
+                group.rotation.y += CONFIG.animation.treeRotationSpeed;
                 
-                for(let i=0; i<count; i++) {
+                for(let i = 0; i < count; i++) {
                     sizes[i] = baseSize;
-                    let brightness = 1.0;
-                    if(type === 'red' || type === 'icon') {
-                        // RED
-                        brightness = 0.5 + 0.5 * Math.sin(time * 3 + phases[i]);
-                    } else if(type === 'gold') {
-                        // YELLOW
-                        brightness = 0.8 + 0.4 * Math.sin(time * 10 + phases[i]);
-                    } else if(type === 'pine') {
-                        // Bauble pink twinkle
-                        brightness = 0.85 + 0.15 * Math.sin(time * 6 + phases[i]);
-                    } else if(type === 'green') {
-                        // Green twinkle
-                        brightness = 0.8 + 0.2 * Math.sin(time * 4 + phases[i]);
-                    }
-                    colors[i*3]   = baseColor.r * brightness;
-                    colors[i*3+1] = baseColor.g * brightness;
-                    colors[i*3+2] = baseColor.b * brightness;
+                    const brightness = calculateBrightness(type, time, phases[i], STATES.TREE);
+                    const idx = i * 3;
+                    colors[idx] = baseColor.r * brightness;
+                    colors[idx + 1] = baseColor.g * brightness;
+                    colors[idx + 2] = baseColor.b * brightness;
                 }
                 group.geometry.attributes.color.needsUpdate = true;
                 group.geometry.attributes.size.needsUpdate = true;
 
-            } else if (targetState === 'HEART') {
+            } else if (targetState === STATES.HEART) {
                 group.rotation.y = 0;
-                const beatScale = 1 + Math.abs(Math.sin(time * 3)) * 0.15;
+                const beatScale = 1 + Math.abs(Math.sin(time * CONFIG.animation.heartBeatSpeed)) * 0.15;
                 group.scale.set(beatScale, beatScale, beatScale);
 
-                // Vandiep
-                for(let i=0; i<count; i++) {
-                    colors[i*3] = baseColor.r; colors[i*3+1] = baseColor.g; colors[i*3+2] = baseColor.b;
-                    if (i % 3 === 0) sizes[i] = baseSize;
-                    else sizes[i] = 0;
+                for(let i = 0; i < count; i++) {
+                    const idx = i * 3;
+                    colors[idx] = baseColor.r;
+                    colors[idx + 1] = baseColor.g;
+                    colors[idx + 2] = baseColor.b;
+                    sizes[i] = (i % 3 === 0) ? baseSize : 0;
                 }
                 group.geometry.attributes.color.needsUpdate = true;
                 group.geometry.attributes.size.needsUpdate = true;
 
             } else {
-                // EXPLODE
-                group.scale.set(1,1,1);
+                // EXPLODE state
+                group.scale.set(1, 1, 1);
                 group.rotation.y += (handRotY - group.rotation.y) * 0.1;
 
-                // size, color
-                for(let i=0; i<count; i++) {
+                for(let i = 0; i < count; i++) {
                     sizes[i] = baseSize;
-                    let brightness = 1.0;
-                    if(type === 'gold' || type === 'red' || type === 'icon') {
-                        brightness = 0.8 + 0.5 * Math.sin(time * 12 + phases[i]);
-                    } else if(type === 'pine') {
-                        brightness = 0.9 + 0.1 * Math.sin(time * 8 + phases[i]);
-                    } else if(type === 'green') {
-                        brightness = 0.9 + 0.15 * Math.sin(time * 9 + phases[i]);
-                    }
-                    colors[i*3]   = baseColor.r * brightness;
-                    colors[i*3+1] = baseColor.g * brightness;
-                    colors[i*3+2] = baseColor.b * brightness;
+                    const brightness = calculateBrightness(type, time, phases[i], STATES.EXPLODE);
+                    const idx = i * 3;
+                    colors[idx] = baseColor.r * brightness;
+                    colors[idx + 1] = baseColor.g * brightness;
+                    colors[idx + 2] = baseColor.b * brightness;
                 }
                 group.geometry.attributes.size.needsUpdate = true;
                 group.geometry.attributes.color.needsUpdate = true;
@@ -507,141 +597,214 @@
             const speed = 0.08;
             const handRotY = (handX - 0.5) * 4.0;
 
-            updateParticleGroup(groupGold, 'gold', state, speed, handRotY, time);
-            updateParticleGroup(groupRed, 'red', state, speed, handRotY, time);
-            updateParticleGroup(groupPine, 'pine', state, speed, handRotY, time);
-            updateParticleGroup(groupGreen, 'green', state, speed, handRotY, time);
-            updateParticleGroup(groupIcon, 'icon', state, speed, handRotY, time);
-            updateParticleGroup(groupGift, 'gift', state, speed, handRotY, time);
+            // Update all particle groups
+            PARTICLE_TYPES.forEach(({ type }) => {
+                updateParticleGroup(particleGroups[type], type, state, speed, handRotY, time);
+            });
+            
             updateSnow(time);
 
+            // Update photo textures if needed
             photoMeshes.forEach((mesh, i) => {
-                if(!mesh.material.map && photoTextures[i]) {
-                    mesh.material.map = photoTextures[i]; mesh.material.needsUpdate = true;
+                if (!mesh.material.map && photoTextures[i]) {
+                    mesh.material.map = photoTextures[i];
+                    mesh.material.needsUpdate = true;
                 }
             });
 
-            if (state === 'TREE') {
-                titleMesh.visible = true; starMesh.visible = true; loveMesh.visible = false;
-                titleMesh.scale.lerp(new THREE.Vector3(1,1,1), 0.1);
-                starMesh.rotation.z -= 0.02; 
-                starMesh.material.opacity = 0.7 + 0.3*Math.sin(time*5);
-                photoMeshes.forEach(m => { m.scale.lerp(new THREE.Vector3(0,0,0), 0.1); m.visible = false; });
+            // Update scene based on state
+            const zeroScale = new THREE.Vector3(0, 0, 0);
+            const oneScale = new THREE.Vector3(1, 1, 1);
+            
+            if (state === STATES.TREE) {
+                titleMesh.visible = true;
+                starMesh.visible = true;
+                loveMesh.visible = false;
+                titleMesh.scale.lerp(oneScale, CONFIG.animation.lerpSpeed);
+                starMesh.rotation.z -= CONFIG.animation.starRotationSpeed;
+                starMesh.material.opacity = 0.7 + 0.3 * Math.sin(time * 5);
+                photoMeshes.forEach(m => {
+                    m.scale.lerp(zeroScale, CONFIG.animation.lerpSpeed);
+                    m.visible = false;
+                });
 
-            } else if (state === 'HEART') {
-                titleMesh.visible = false; starMesh.visible = false; loveMesh.visible = true;
+            } else if (state === STATES.HEART) {
+                titleMesh.visible = false;
+                starMesh.visible = false;
+                loveMesh.visible = true;
                 photoMeshes.forEach(m => { m.visible = false; });
-                const s = 1 + Math.abs(Math.sin(time*3))*0.1;
-                loveMesh.scale.set(s,s,1);
+                const scale = 1 + Math.abs(Math.sin(time * CONFIG.animation.heartBeatSpeed)) * 0.1;
+                loveMesh.scale.set(scale, scale, 1);
 
-            } else if (state === 'EXPLODE') {
-                titleMesh.visible = false; starMesh.visible = false; loveMesh.visible = false;
-                const baseAngle = groupGold.rotation.y; 
-                const angleStep = (Math.PI * 2) / 5;
-                let bestIdx = 0; let maxZ = -999;
+            } else if (state === STATES.EXPLODE) {
+                titleMesh.visible = false;
+                starMesh.visible = false;
+                loveMesh.visible = false;
+                const baseAngle = particleGroups.gold.rotation.y;
+                const angleStep = (Math.PI * 2) / photoMeshes.length;
+                let bestIdx = 0;
+                let maxZ = -999;
+                
                 photoMeshes.forEach((mesh, i) => {
                     mesh.visible = true;
                     const angle = baseAngle + i * angleStep;
                     const x = Math.sin(angle) * CONFIG.photoOrbitRadius;
                     const z = Math.cos(angle) * CONFIG.photoOrbitRadius;
-                    const y = Math.sin(time + i) * 3; 
-                    mesh.position.lerp(new THREE.Vector3(x, y, z), 0.1);
+                    const y = Math.sin(time + i) * 3;
+                    mesh.position.lerp(new THREE.Vector3(x, y, z), CONFIG.animation.lerpSpeed);
                     mesh.lookAt(camera.position);
-                    if (z > maxZ) { maxZ = z; bestIdx = i; }
-                    if (z > 5) { 
-                        const ds = 1.0 + (z/CONFIG.photoOrbitRadius)*0.8; 
-                        mesh.scale.lerp(new THREE.Vector3(ds, ds, ds), 0.1);
-                    } else {
-                        mesh.scale.lerp(new THREE.Vector3(0.6, 0.6, 0.6), 0.1);
+                    
+                    if (z > maxZ) {
+                        maxZ = z;
+                        bestIdx = i;
                     }
+                    
+                    const targetScale = z > 5 
+                        ? 1.0 + (z / CONFIG.photoOrbitRadius) * 0.8
+                        : 0.6;
+                    const scaleVec = new THREE.Vector3(targetScale, targetScale, targetScale);
+                    mesh.scale.lerp(scaleVec, CONFIG.animation.lerpSpeed);
                 });
                 selectedIndex = bestIdx;
 
-            } else if (state === 'PHOTO') {
+            } else if (state === STATES.PHOTO) {
                 loveMesh.visible = false;
                 photoMeshes.forEach((mesh, i) => {
                     if (i === selectedIndex) {
-                        mesh.position.lerp(new THREE.Vector3(0, 0, 60), 0.1);
-                        mesh.scale.lerp(new THREE.Vector3(5, 5, 5), 0.1);
-                        mesh.lookAt(camera.position); mesh.rotation.z = 0;
+                        mesh.position.lerp(new THREE.Vector3(0, 0, 60), CONFIG.animation.lerpSpeed);
+                        mesh.scale.lerp(new THREE.Vector3(5, 5, 5), CONFIG.animation.lerpSpeed);
+                        mesh.lookAt(camera.position);
+                        mesh.rotation.z = 0;
                     } else {
-                        mesh.scale.lerp(new THREE.Vector3(0,0,0), 0.1);
+                        mesh.scale.lerp(zeroScale, CONFIG.animation.lerpSpeed);
                     }
                 });
             }
+            
             renderer.render(scene, camera);
         }
 
         function updateSnow(time) {
-            if(!snowGroup) return;
+            if (!snowGroup) return;
+            
             const positions = snowGroup.geometry.attributes.position.array;
-            for(let i=0;i<positions.length;i+=3){
-                positions[i+1] -= snowVelocity[i/3];
+            const snowBounds = { minY: -60, maxY: 120, xRange: 220, zRange: 220, zOffset: -40 };
+            
+            for(let i = 0; i < positions.length; i += 3) {
+                const idx = i / 3;
+                positions[i + 1] -= snowVelocity[idx];
                 positions[i] += Math.sin(time + i) * 0.02;
-                positions[i+2] += Math.cos(time * 0.5 + i) * 0.01;
-                if(positions[i+1] < -60){
-                    positions[i] = (Math.random()-0.5) * 220;
-                    positions[i+1] = 90 + Math.random()*30;
-                    positions[i+2] = (Math.random()-0.5) * 220 - 40;
-                    snowVelocity[i/3] = 0.1 + Math.random()*0.25;
+                positions[i + 2] += Math.cos(time * 0.5 + i) * 0.01;
+                
+                // Reset snowflake when it falls below screen
+                if (positions[i + 1] < snowBounds.minY) {
+                    positions[i] = (Math.random() - 0.5) * snowBounds.xRange;
+                    positions[i + 1] = 90 + Math.random() * 30;
+                    positions[i + 2] = (Math.random() - 0.5) * snowBounds.zRange + snowBounds.zOffset;
+                    snowVelocity[idx] = 0.1 + Math.random() * 0.25;
                 }
             }
             snowGroup.geometry.attributes.position.needsUpdate = true;
         }
 
         function startSystem() {
-            document.getElementById('btnStart').style.display = 'none';
-            bgMusic.play().catch(e => console.log(e));
+            const btnStart = document.getElementById('btnStart');
+            if (btnStart) {
+                btnStart.style.display = 'none';
+            }
+            
+            // Start background music
+            bgMusic.play().catch(err => console.warn('Could not play audio:', err));
+            
+            // Initialize 3D scene
             init3D();
 
+            // Setup hand tracking
             const video = document.getElementsByClassName('input_video')[0];
             const canvas = document.getElementById('camera-preview');
+            
+            if (!video || !canvas) {
+                console.error('Video or canvas element not found');
+                return;
+            }
+            
             const ctx = canvas.getContext('2d');
             
-            const hands = new Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
-            hands.setOptions({ maxNumHands: 2, modelComplexity: 1, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
+            const hands = new Hands({
+                locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+            });
+            
+            hands.setOptions({
+                maxNumHands: 2,
+                modelComplexity: 1,
+                minDetectionConfidence: 0.5,
+                minTrackingConfidence: 0.5
+            });
 
             hands.onResults(results => {
-                ctx.clearRect(0,0,100,75); ctx.drawImage(results.image, 0, 0, 100, 75);
+                // Update camera preview
+                ctx.clearRect(0, 0, 100, 75);
+                ctx.drawImage(results.image, 0, 0, 100, 75);
 
-                // --- Hand Logic  ---
+                // Detect heart gesture (two hands forming heart)
                 if (results.multiHandLandmarks.length === 2) {
-                    const h1 = results.multiHandLandmarks[0]; const h2 = results.multiHandLandmarks[1];
+                    const h1 = results.multiHandLandmarks[0];
+                    const h2 = results.multiHandLandmarks[1];
                     const distIndex = Math.hypot(h1[8].x - h2[8].x, h1[8].y - h2[8].y);
                     const distThumb = Math.hypot(h1[4].x - h2[4].x, h1[4].y - h2[4].y);
+                    
                     if (distIndex < 0.15 && distThumb < 0.15) {
-                        state = 'HEART'; return;
+                        state = STATES.HEART;
+                        return;
                     }
                 }
 
-                if(results.multiHandLandmarks.length > 0) {
+                // Detect single hand gestures
+                if (results.multiHandLandmarks.length > 0) {
                     const lm = results.multiHandLandmarks[0];
-                    handX = lm[9].x; 
-                    const tips = [8,12,16,20]; const wrist = lm[0];
-                    let openDist = 0; tips.forEach(i => openDist += Math.hypot(lm[i].x-wrist.x, lm[i].y-wrist.y));
-                    const avgDist = openDist / 4;
-                    const pinchDist = Math.hypot(lm[4].x-lm[8].x, lm[4].y-lm[8].y);
+                    handX = lm[9].x;
+                    
+                    const tips = [8, 12, 16, 20];
+                    const wrist = lm[0];
+                    let openDist = 0;
+                    
+                    tips.forEach(i => {
+                        openDist += Math.hypot(lm[i].x - wrist.x, lm[i].y - wrist.y);
+                    });
+                    
+                    const avgDist = openDist / tips.length;
+                    const pinchDist = Math.hypot(lm[4].x - lm[8].x, lm[4].y - lm[8].y);
 
-                    if (avgDist < 0.25) { 
-                        state = 'TREE'; 
+                    if (avgDist < 0.25) {
+                        state = STATES.TREE;
                     } else if (pinchDist < 0.05) {
-                        state = 'PHOTO'; 
+                        state = STATES.PHOTO;
                     } else {
-                        state = 'EXPLODE'; 
+                        state = STATES.EXPLODE;
                     }
                 } else {
-                    state = 'TREE'; 
+                    state = STATES.TREE;
                 }
             });
 
+            // Start camera
             const cameraUtils = new Camera(video, {
-                onFrame: async () => { await hands.send({image: video}); }, width: 320, height: 240
+                onFrame: async () => {
+                    await hands.send({ image: video });
+                },
+                width: 320,
+                height: 240
             });
+            
             cameraUtils.start();
         }
 
         window.addEventListener('resize', () => {
-            if(camera) { camera.aspect = window.innerWidth/window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); }
+            if (camera && renderer) {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+            }
         });
     </script>
 </body>
